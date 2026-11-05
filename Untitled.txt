@@ -1,0 +1,829 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Night Racer</title>
+<style>
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 18px;
+  text-align: center;
+  color: white;
+  font-family: Arial, sans-serif;
+  background: radial-gradient(circle at top, #172554, #020617 75%);
+}
+h1 { color: #67e8f9; text-shadow: 0 0 15px #06b6d4; }
+.game-wrap { max-width: 440px; margin: auto; }
+.hud {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 12px auto;
+  padding: 10px;
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 10px;
+}
+.hud span { color: #fde68a; font-weight: bold; }
+canvas {
+  display: block;
+  width: min(400px, 94vw);
+  height: auto;
+  margin: auto;
+  background: #111827;
+  border: 3px solid #22d3ee;
+  border-radius: 10px;
+  box-shadow: 0 0 20px #0891b2;
+}
+button, select {
+  color: white;
+  background: #0e7490;
+  border: 1px solid #67e8f9;
+  border-radius: 8px;
+  padding: 10px 13px;
+  margin: 4px;
+  font-size: 14px;
+  cursor: pointer;
+  touch-action: none;
+}
+button:hover { background: #155e75; }
+.panel {
+  margin: 14px auto;
+  padding: 12px;
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  text-align: left;
+}
+.panel h2 { color: #67e8f9; margin: 4px 0 10px; }
+.achievement {
+  padding: 9px;
+  margin: 7px 0;
+  border-radius: 8px;
+  background: #1e293b;
+  border: 1px solid #475569;
+}
+.achievement.unlocked {
+  border-color: #facc15;
+  background: #422006;
+}
+.achievement small {
+  display: block;
+  color: #cbd5e1;
+  margin-top: 4px;
+}
+.progress {
+  height: 8px;
+  background: #334155;
+  border-radius: 10px;
+  overflow: hidden;
+  margin-top: 7px;
+}
+.progress div { height: 100%; background: #22d3ee; }
+#message {
+  color: #fde68a;
+  min-height: 22px;
+  font-weight: bold;
+}
+#turboTrack {
+  width: min(400px, 94vw);
+  height: 12px;
+  margin: 8px auto;
+  background: #334155;
+  border-radius: 10px;
+  overflow: hidden;
+}
+#turboBar {
+  width: 100%;
+  height: 100%;
+  background: #22d3ee;
+}
+</style>
+</head>
+<body>
+
+<div class="game-wrap">
+  <h1>🏎️ NIGHT RACER</h1>
+
+  <div class="hud">
+    <div>Score: <span id="score">0</span></div>
+    <div>Speed: <span id="speed">1</span></div>
+    <div>Coins: 🪙 <span id="coins">0</span></div>
+    <div>Best: <span id="best">0</span></div>
+  </div>
+
+  <label for="mapSelect">Choose map: </label>
+  <select id="mapSelect" onchange="changeMap(this.value)">
+    <option value="city">City</option>
+    <option value="desert">Desert</option>
+    <option value="highway">Highway</option>
+  </select>
+
+  <canvas id="game" width="400" height="600"></canvas>
+
+  <div id="turboTrack"><div id="turboBar"></div></div>
+  <div>Turbo energy</div>
+
+  <div>
+    <button
+      onpointerdown="startMoving(-1)"
+      onpointerup="stopMoving()"
+      onpointerleave="stopMoving()"
+      onpointercancel="stopMoving()">⬅ LEFT</button>
+
+    <button onclick="activateTurbo()">⚡ TURBO</button>
+
+    <button
+      onpointerdown="startMoving(1)"
+      onpointerup="stopMoving()"
+      onpointerleave="stopMoving()"
+      onpointercancel="stopMoving()">RIGHT ➡</button>
+  </div>
+
+  <div>
+    <button onclick="togglePause()">⏸ PAUSE</button>
+    <button onclick="restartGame()">🔄 RESTART</button>
+  </div>
+
+  <p id="message">Collect the gold coins! 🪙</p>
+
+  <div class="panel">
+    <h2>🏆 Achievements</h2>
+    <div id="achievementList"></div>
+  </div>
+
+  <div class="panel">
+    <h2>🚘 Car Garage</h2>
+    <p>Buy cars with your earned coins.</p>
+    <div id="garage"></div>
+  </div>
+
+  <div class="panel">
+    <h2>🎁 Prizes</h2>
+    <p>Collect coins on the road and unlock achievements.</p>
+    <p>Coins available: 🪙 <strong id="prizeCoins">0</strong></p>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+const scoreEl = document.getElementById("score");
+const speedEl = document.getElementById("speed");
+const coinsEl = document.getElementById("coins");
+const bestEl = document.getElementById("best");
+const messageEl = document.getElementById("message");
+const turboBar = document.getElementById("turboBar");
+
+const roadLeft = 55;
+const roadRight = 345;
+
+let score = 0;
+let speed = 1;
+let gameOver = false;
+let paused = false;
+let frame = 0;
+let roadLineOffset = 0;
+let turboEnergy = 100;
+let turboActive = false;
+let turboUses = 0;
+let currentMap = "city";
+let enemies = [];
+let roadCoins = [];
+let lastTime = 0;
+let coinMessageTimer = 0;
+
+const keys = { left: false, right: false };
+let buttonDirection = 0;
+
+const player = {
+  x: 180,
+  y: 490,
+  w: 40,
+  h: 72,
+  moveSpeed: 330
+};
+
+const cars = [
+  { id: "starter", name: "Starter", color: "#06b6d4", price: 0 },
+  { id: "red", name: "Fire Racer", color: "#ef4444", price: 150 },
+  { id: "green", name: "Lime Machine", color: "#22c55e", price: 300 },
+  { id: "purple", name: "Purple Storm", color: "#a855f7", price: 500 },
+  { id: "gold", name: "Golden Legend", color: "#facc15", price: 800 }
+];
+
+const achievements = [
+  { id: "first", name: "First Race", description: "Reach 100 points", reward: 50 },
+  { id: "speed", name: "Speed Demon", description: "Reach speed level 5", reward: 100 },
+  { id: "survivor", name: "Survivor", description: "Reach 500 points", reward: 150 },
+  { id: "highscore", name: "High Scorer", description: "Reach 1,000 points", reward: 250 },
+  { id: "turbo", name: "Turbo Master", description: "Use turbo 10 times", reward: 100 },
+  { id: "collector", name: "Car Collector", description: "Unlock every car", reward: 300 }
+];
+
+function loadData() {
+  try {
+    return JSON.parse(localStorage.getItem("nightRacerSave")) || {};
+  } catch {
+    return {};
+  }
+}
+
+const saved = loadData();
+
+let coins = Number(saved.coins) || 0;
+let best = Number(saved.best) || 0;
+let unlockedCars = Array.isArray(saved.unlockedCars)
+  ? saved.unlockedCars : ["starter"];
+let selectedCar = saved.selectedCar || "starter";
+let unlockedAchievements = Array.isArray(saved.unlockedAchievements)
+  ? saved.unlockedAchievements : [];
+
+if (!cars.some(car => car.id === selectedCar) ||
+    !unlockedCars.includes(selectedCar)) {
+  selectedCar = "starter";
+}
+
+function saveData() {
+  localStorage.setItem("nightRacerSave", JSON.stringify({
+    coins,
+    best,
+    unlockedCars,
+    selectedCar,
+    unlockedAchievements
+  }));
+}
+
+function selectedColor() {
+  return cars.find(car => car.id === selectedCar)?.color || "#06b6d4";
+}
+
+function updateHUD() {
+  scoreEl.textContent = score;
+  speedEl.textContent = speed;
+  coinsEl.textContent = coins;
+  bestEl.textContent = best;
+  document.getElementById("prizeCoins").textContent = coins;
+
+  turboBar.style.width = turboEnergy + "%";
+  turboBar.style.background =
+    turboEnergy < 25 ? "#ef4444" : "#22d3ee";
+}
+
+function changeMap(map) {
+  currentMap = map;
+  draw();
+}
+
+function drawBackground() {
+  if (currentMap === "desert") {
+    ctx.fillStyle = "#ca8a04";
+    ctx.fillRect(0, 0, 400, 600);
+    ctx.fillStyle = "#78350f";
+    ctx.fillRect(0, 0, 55, 600);
+    ctx.fillRect(345, 0, 55, 600);
+  } else if (currentMap === "highway") {
+    ctx.fillStyle = "#166534";
+    ctx.fillRect(0, 0, 400, 600);
+  } else {
+    ctx.fillStyle = "#111827";
+    ctx.fillRect(0, 0, 400, 600);
+    ctx.fillStyle = "#1e293b";
+    ctx.fillRect(0, 0, 55, 600);
+    ctx.fillRect(345, 0, 55, 600);
+
+    for (let y = 0; y < 600; y += 100) {
+      let yy = (y + roadLineOffset * 0.3) % 650;
+      ctx.fillStyle = "#334155";
+      ctx.fillRect(12, yy, 25, 45);
+      ctx.fillRect(363, yy, 25, 45);
+      ctx.fillStyle = "#facc15";
+      ctx.fillRect(20, yy + 10, 5, 5);
+      ctx.fillRect(370, yy + 10, 5, 5);
+    }
+  }
+
+  ctx.fillStyle = "#475569";
+  ctx.fillRect(roadLeft, 0, 290, 600);
+
+  ctx.fillStyle = "#f8fafc";
+  ctx.fillRect(roadLeft, 0, 4, 600);
+  ctx.fillRect(roadRight - 4, 0, 4, 600);
+
+  ctx.fillStyle = "#facc15";
+  for (let y = -100; y < 700; y += 100) {
+    let lineY = (y + roadLineOffset) % 700;
+    ctx.fillRect(150, lineY, 5, 45);
+    ctx.fillRect(245, lineY, 5, 45);
+  }
+}
+
+function roundedRect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, r);
+}
+
+function drawCar(x, y, w, h, color, isPlayer = false) {
+  ctx.fillStyle = "rgba(0,0,0,0.4)";
+  roundedRect(x + 3, y + 5, w, h, 9);
+  ctx.fill();
+
+  ctx.fillStyle = "#020617";
+  ctx.fillRect(x - 4, y + 12, 7, 18);
+  ctx.fillRect(x + w - 3, y + 12, 7, 18);
+  ctx.fillRect(x - 4, y + h - 30, 7, 18);
+  ctx.fillRect(x + w - 3, y + h - 30, 7, 18);
+
+  const gradient = ctx.createLinearGradient(x, y, x + w, y);
+  gradient.addColorStop(0, "#111827");
+  gradient.addColorStop(0.25, color);
+  gradient.addColorStop(0.75, color);
+  gradient.addColorStop(1, "#111827");
+
+  ctx.fillStyle = gradient;
+  roundedRect(x, y, w, h, 9);
+  ctx.fill();
+
+  ctx.strokeStyle = "rgba(255,255,255,0.55)";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  ctx.fillStyle = "#0f172a";
+  roundedRect(x + 6, y + 12, w - 12, 18, 5);
+  ctx.fill();
+  roundedRect(x + 6, y + 42, w - 12, 14, 4);
+  ctx.fill();
+
+  ctx.fillStyle = "rgba(255,255,255,0.35)";
+  ctx.fillRect(x + 10, y + 15, 3, 12);
+
+  ctx.fillStyle = color;
+  roundedRect(x + 8, y + 31, w - 16, 10, 3);
+  ctx.fill();
+
+  ctx.fillStyle = isPlayer ? "#fef08a" : "#ef4444";
+
+  if (isPlayer) {
+    ctx.fillRect(x + 4, y + 2, 9, 5);
+    ctx.fillRect(x + w - 13, y + 2, 9, 5);
+  } else {
+    ctx.fillRect(x + 4, y + h - 6, 9, 5);
+    ctx.fillRect(x + w - 13, y + h - 6, 9, 5);
+  }
+
+  if (isPlayer && turboActive) {
+    ctx.fillStyle = "#f97316";
+    ctx.fillRect(x + 9, y + h, 6, 22);
+    ctx.fillRect(x + 25, y + h, 6, 22);
+  }
+}
+
+// Draw collectible coins
+function drawCoin(coin) {
+  const pulse = Math.sin(frame * 0.12 + coin.phase) * 2;
+  const radius = 10 + pulse;
+
+  ctx.save();
+
+  ctx.shadowColor = "#facc15";
+  ctx.shadowBlur = 15;
+
+  ctx.fillStyle = "#facc15";
+  ctx.beginPath();
+  ctx.arc(coin.x, coin.y, radius, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = "#fef3c7";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  ctx.fillStyle = "#92400e";
+  ctx.font = "bold 13px Arial";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("$", coin.x, coin.y + 1);
+
+  ctx.restore();
+}
+
+// Create coins in one of the road lanes
+function spawnCoin() {
+  const lanes = [105, 200, 295];
+
+  roadCoins.push({
+    x: lanes[Math.floor(Math.random() * lanes.length)],
+    y: -30,
+    radius: 12,
+    phase: Math.random() * Math.PI * 2,
+    value: 5
+  });
+}
+
+function collectCoin(index) {
+  const coin = roadCoins[index];
+
+  coins += coin.value;
+  score += 5;
+
+  roadCoins.splice(index, 1);
+
+  messageEl.textContent = "🪙 +5 COINS! Great driving!";
+  coinMessageTimer = 120;
+
+  updateHUD();
+  saveData();
+  checkAchievements();
+}
+
+function spawnEnemy() {
+  const lanes = [90, 180, 270];
+  const lane = lanes[Math.floor(Math.random() * lanes.length)];
+  const colors = ["#ef4444", "#22c55e", "#a855f7", "#f97316", "#eab308"];
+
+  enemies.push({
+    x: lane,
+    y: -90,
+    w: 40,
+    h: 72,
+    color: colors[Math.floor(Math.random() * colors.length)],
+    passed: false
+  });
+}
+
+function startMoving(direction) {
+  buttonDirection = direction;
+}
+
+function stopMoving() {
+  buttonDirection = 0;
+}
+
+function activateTurbo() {
+  if (!gameOver && !paused && turboEnergy >= 20 && !turboActive) {
+    turboActive = true;
+    turboUses++;
+    checkAchievements();
+
+    setTimeout(() => {
+      turboActive = false;
+    }, 1500);
+  }
+}
+
+function togglePause() {
+  if (gameOver) return;
+  paused = !paused;
+  messageEl.textContent = paused ? "Game paused" : "Race resumed!";
+}
+
+function checkCollision(a, b) {
+  return a.x + 5 < b.x + b.w - 5 &&
+    a.x + a.w - 5 > b.x + 5 &&
+    a.y + 7 < b.y + b.h - 7 &&
+    a.y + a.h - 7 > b.y + 7;
+}
+
+function checkCoinCollision(car, coin) {
+  const closestX = Math.max(car.x, Math.min(coin.x, car.x + car.w));
+  const closestY = Math.max(car.y, Math.min(coin.y, car.y + car.h));
+
+  const dx = coin.x - closestX;
+  const dy = coin.y - closestY;
+
+  return dx * dx + dy * dy < coin.radius * coin.radius;
+}
+
+function unlockAchievement(id) {
+  if (unlockedAchievements.includes(id)) return;
+
+  const achievement = achievements.find(a => a.id === id);
+  if (!achievement) return;
+
+  unlockedAchievements.push(id);
+  coins += achievement.reward;
+
+  messageEl.textContent =
+    "🏆 " + achievement.name + "! +" + achievement.reward + " coins!";
+
+  saveData();
+  updateHUD();
+  renderAchievements();
+}
+
+function checkAchievements() {
+  if (score >= 100) unlockAchievement("first");
+  if (speed >= 5) unlockAchievement("speed");
+  if (score >= 500) unlockAchievement("survivor");
+  if (score >= 1000) unlockAchievement("highscore");
+  if (turboUses >= 10) unlockAchievement("turbo");
+  if (unlockedCars.length >= cars.length) unlockAchievement("collector");
+}
+
+function renderAchievements() {
+  const list = document.getElementById("achievementList");
+  list.innerHTML = "";
+
+  achievements.forEach(a => {
+    const unlocked = unlockedAchievements.includes(a.id);
+    let progress = 0;
+
+    if (a.id === "first") progress = Math.min(score / 100 * 100, 100);
+    if (a.id === "speed") progress = Math.min(speed / 5 * 100, 100);
+    if (a.id === "survivor") progress = Math.min(score / 500 * 100, 100);
+    if (a.id === "highscore") progress = Math.min(score / 1000 * 100, 100);
+    if (a.id === "turbo") progress = Math.min(turboUses / 10 * 100, 100);
+    if (a.id === "collector") progress = Math.min(unlockedCars.length / cars.length * 100, 100);
+
+    const div = document.createElement("div");
+    div.className = "achievement" + (unlocked ? " unlocked" : "");
+    div.innerHTML = `
+      <strong>${unlocked ? "🏆" : "🔒"} ${a.name}</strong>
+      <small>${a.description}</small>
+      <small>Prize: ${a.reward} coins</small>
+      <div class="progress">
+        <div style="width:${progress}%"></div>
+      </div>
+    `;
+    list.appendChild(div);
+  });
+}
+
+function renderGarage() {
+  const garage = document.getElementById("garage");
+  garage.innerHTML = "";
+
+  cars.forEach(car => {
+    const unlocked = unlockedCars.includes(car.id);
+    const selected = selectedCar === car.id;
+
+    const div = document.createElement("div");
+    div.className = "achievement";
+    div.innerHTML = `
+      <strong style="color:${car.color}">🚘 ${car.name}</strong>
+      <small>${unlocked ? "Unlocked" : "Price: " + car.price + " coins"}</small>
+      <small>${selected ? "Currently selected" : ""}</small>
+      <button>${selected ? "SELECTED" : unlocked ? "SELECT" : "BUY"}</button>
+    `;
+
+    div.querySelector("button").addEventListener("click", () => {
+      if (unlocked) {
+        selectedCar = car.id;
+        saveData();
+        renderGarage();
+        messageEl.textContent = car.name + " selected!";
+      } else {
+        buyCar(car);
+      }
+    });
+
+    garage.appendChild(div);
+  });
+}
+
+function buyCar(car) {
+  if (coins < car.price) {
+    messageEl.textContent = "Not enough coins to buy " + car.name + "!";
+    return;
+  }
+
+  if (unlockedCars.includes(car.id)) return;
+
+  coins -= car.price;
+  unlockedCars.push(car.id);
+  selectedCar = car.id;
+
+  saveData();
+  updateHUD();
+  renderGarage();
+  checkAchievements();
+
+  messageEl.textContent = "🎉 You unlocked " + car.name + "!";
+}
+
+function endGame() {
+  gameOver = true;
+  turboActive = false;
+
+  if (score > best) {
+    best = score;
+    saveData();
+  }
+
+  updateHUD();
+  messageEl.textContent =
+    "💥 CRASH! Final score: " + score + ". Press SPACE to restart.";
+}
+
+function update(delta) {
+  if (gameOver || paused) return;
+
+  frame++;
+
+  // Smooth movement
+  let direction = 0;
+
+  if (keys.left) direction -= 1;
+  if (keys.right) direction += 1;
+  direction += buttonDirection;
+  direction = Math.max(-1, Math.min(1, direction));
+
+  player.x += direction * player.moveSpeed * delta;
+  player.x = Math.max(
+    roadLeft + 10,
+    Math.min(roadRight - player.w - 10, player.x)
+  );
+
+  const gameSpeed = (turboActive ? 7 : 3) + speed * 0.45;
+  const movement = gameSpeed * delta * 60;
+
+  roadLineOffset = (roadLineOffset + movement) % 100;
+
+  // Spawn traffic
+  if (frame % Math.max(22, 65 - speed * 5) === 0) {
+    spawnEnemy();
+  }
+
+  // Spawn collectible coins
+  if (frame % 65 === 0 && roadCoins.length < 5) {
+    spawnCoin();
+  }
+
+  // Update enemy cars
+  for (const enemy of enemies) {
+    enemy.y += movement;
+
+    if (checkCollision(player, enemy)) {
+      endGame();
+      break;
+    }
+
+    if (!enemy.passed && enemy.y > player.y + player.h) {
+      enemy.passed = true;
+      score += 10;
+
+      updateHUD();
+      checkAchievements();
+      saveData();
+    }
+  }
+
+  enemies = enemies.filter(enemy => enemy.y < 650);
+
+  // Update and collect coins
+  for (let i = roadCoins.length - 1; i >= 0; i--) {
+    const coin = roadCoins[i];
+    coin.y += movement;
+
+    if (checkCoinCollision(player, coin)) {
+      collectCoin(i);
+    }
+  }
+
+  roadCoins = roadCoins.filter(coin => coin.y < 650);
+
+  if (frame % 300 === 0) {
+    speed++;
+    checkAchievements();
+  }
+
+  if (turboActive) {
+    turboEnergy = Math.max(0, turboEnergy - 48 * delta);
+    if (turboEnergy <= 0) turboActive = false;
+  } else {
+    turboEnergy = Math.min(100, turboEnergy + 11 * delta);
+  }
+
+  if (coinMessageTimer > 0) {
+    coinMessageTimer--;
+  }
+
+  updateHUD();
+}
+
+function draw() {
+  drawBackground();
+
+  // Draw coins behind cars
+  roadCoins.forEach(drawCoin);
+
+  enemies.forEach(enemy => {
+    drawCar(enemy.x, enemy.y, enemy.w, enemy.h, enemy.color);
+  });
+
+  drawCar(player.x, player.y, player.w, player.h, selectedColor(), true);
+
+  if (paused || gameOver) {
+    ctx.fillStyle = "rgba(2,6,23,0.75)";
+    ctx.fillRect(0, 0, 400, 600);
+    ctx.fillStyle = "#67e8f9";
+    ctx.font = "bold 34px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText(paused ? "PAUSED" : "GAME OVER", 200, 280);
+    ctx.font = "18px Arial";
+    ctx.fillStyle = "white";
+    ctx.fillText(
+      paused ? "Press P to resume" : "Press SPACE to restart",
+      200, 320
+    );
+  }
+}
+
+function gameLoop(timestamp) {
+  const delta = lastTime
+    ? Math.min((timestamp - lastTime) / 1000, 0.04)
+    : 0;
+
+  lastTime = timestamp;
+
+  if (!paused && !gameOver) {
+    update(delta);
+  }
+
+  draw();
+  requestAnimationFrame(gameLoop);
+}
+
+function restartGame() {
+  score = 0;
+  speed = 1;
+  frame = 0;
+  enemies = [];
+  roadCoins = [];
+  turboEnergy = 100;
+  turboActive = false;
+  gameOver = false;
+  paused = false;
+  coinMessageTimer = 0;
+
+  keys.left = false;
+  keys.right = false;
+  buttonDirection = 0;
+
+  player.x = 180;
+  lastTime = 0;
+
+  messageEl.textContent = "Collect the gold coins! 🪙";
+
+  updateHUD();
+  renderAchievements();
+  draw();
+}
+
+// Keyboard controls
+document.addEventListener("keydown", e => {
+  if (["ArrowLeft", "ArrowRight", "ArrowUp", " "].includes(e.key)) {
+    e.preventDefault();
+  }
+
+  if (e.code === "Space" && !e.repeat) {
+    restartGame();
+    return;
+  }
+
+  if (e.key === "ArrowLeft" || e.key.toLowerCase() === "a") {
+    keys.left = true;
+  }
+
+  if (e.key === "ArrowRight" || e.key.toLowerCase() === "d") {
+    keys.right = true;
+  }
+
+  if (e.key === "ArrowUp" && !e.repeat) {
+    activateTurbo();
+  }
+
+  if (e.key.toLowerCase() === "p" && !e.repeat) {
+    togglePause();
+  }
+});
+
+document.addEventListener("keyup", e => {
+  if (e.key === "ArrowLeft" || e.key.toLowerCase() === "a") {
+    keys.left = false;
+  }
+
+  if (e.key === "ArrowRight" || e.key.toLowerCase() === "d") {
+    keys.right = false;
+  }
+});
+
+window.addEventListener("blur", () => {
+  keys.left = false;
+  keys.right = false;
+  buttonDirection = 0;
+});
+
+updateHUD();
+renderAchievements();
+renderGarage();
+draw();
+requestAnimationFrame(gameLoop);
+</script>
+</body>
+</html>
