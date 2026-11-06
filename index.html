@@ -4,826 +4,971 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Night Racer</title>
+<title>Night Racer - Multiplayer</title>
+
+<!-- PeerJS connects players over the internet -->
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+
 <style>
 * { box-sizing: border-box; }
+
 body {
-  margin: 0;
-  padding: 18px;
-  text-align: center;
-  color: white;
-  font-family: Arial, sans-serif;
-  background: radial-gradient(circle at top, #172554, #020617 75%);
+    margin: 0;
+    min-height: 100vh;
+    background: radial-gradient(circle, #172554, #020617);
+    color: white;
+    font-family: Arial, sans-serif;
+    text-align: center;
+    padding: 15px;
 }
-h1 { color: #67e8f9; text-shadow: 0 0 15px #06b6d4; }
-.game-wrap { max-width: 440px; margin: auto; }
-.hud {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin: 12px auto;
-  padding: 10px;
-  background: #0f172a;
-  border: 1px solid #334155;
-  border-radius: 10px;
+
+h1 {
+    color: #67e8f9;
+    text-shadow: 0 0 15px #06b6d4;
+    margin: 8px;
 }
-.hud span { color: #fde68a; font-weight: bold; }
-canvas {
-  display: block;
-  width: min(400px, 94vw);
-  height: auto;
-  margin: auto;
-  background: #111827;
-  border: 3px solid #22d3ee;
-  border-radius: 10px;
-  box-shadow: 0 0 20px #0891b2;
-}
-button, select {
-  color: white;
-  background: #0e7490;
-  border: 1px solid #67e8f9;
-  border-radius: 8px;
-  padding: 10px 13px;
-  margin: 4px;
-  font-size: 14px;
-  cursor: pointer;
-  touch-action: none;
-}
-button:hover { background: #155e75; }
+
 .panel {
-  margin: 14px auto;
-  padding: 12px;
-  background: #0f172a;
-  border: 1px solid #334155;
-  border-radius: 10px;
-  text-align: left;
+    max-width: 450px;
+    margin: 12px auto;
+    padding: 15px;
+    background: #0f172a;
+    border: 1px solid #164e63;
+    border-radius: 14px;
 }
-.panel h2 { color: #67e8f9; margin: 4px 0 10px; }
-.achievement {
-  padding: 9px;
-  margin: 7px 0;
-  border-radius: 8px;
-  background: #1e293b;
-  border: 1px solid #475569;
+
+button, input {
+    padding: 12px;
+    margin: 5px;
+    border-radius: 8px;
+    border: none;
+    font-size: 15px;
 }
-.achievement.unlocked {
-  border-color: #facc15;
-  background: #422006;
+
+button {
+    background: #0891b2;
+    color: white;
+    font-weight: bold;
+    cursor: pointer;
 }
-.achievement small {
-  display: block;
-  color: #cbd5e1;
-  margin-top: 4px;
+
+button:hover { background: #0e7490; }
+
+input {
+    width: 190px;
+    max-width: 90%;
+    background: white;
+    color: black;
 }
-.progress {
-  height: 8px;
-  background: #334155;
-  border-radius: 10px;
-  overflow: hidden;
-  margin-top: 7px;
+
+.hidden { display: none !important; }
+
+#game {
+    display: block;
+    width: min(400px, 94vw);
+    height: auto;
+    margin: 12px auto;
+    border: 3px solid #22d3ee;
+    border-radius: 10px;
+    background: #111827;
+    box-shadow: 0 0 20px #0891b2;
+    touch-action: none;
 }
-.progress div { height: 100%; background: #22d3ee; }
-#message {
-  color: #fde68a;
-  min-height: 22px;
-  font-weight: bold;
+
+.hud {
+    max-width: 400px;
+    margin: auto;
+    display: flex;
+    justify-content: space-around;
+    flex-wrap: wrap;
+    gap: 8px;
+    font-weight: bold;
 }
-#turboTrack {
-  width: min(400px, 94vw);
-  height: 12px;
-  margin: 8px auto;
-  background: #334155;
-  border-radius: 10px;
-  overflow: hidden;
+
+.hud span { color: #fde68a; }
+
+#status {
+    color: #67e8f9;
+    min-height: 22px;
 }
-#turboBar {
-  width: 100%;
-  height: 100%;
-  background: #22d3ee;
+
+.controls {
+    max-width: 400px;
+    margin: auto;
+    display: flex;
+    justify-content: space-around;
+    flex-wrap: wrap;
+}
+
+.controls button {
+    min-width: 85px;
+    font-size: 18px;
+    user-select: none;
+    touch-action: none;
+}
+
+#turboBtn { background: #7c3aed; }
+#turboBtn:active { background: #a78bfa; }
+
+#result {
+    color: #fde68a;
+    font-size: 21px;
+    font-weight: bold;
+    min-height: 28px;
 }
 </style>
 </head>
+
 <body>
 
-<div class="game-wrap">
-  <h1>🏎️ NIGHT RACER</h1>
+<h1>🏎️ NIGHT RACER</h1>
+<p>Choose how you want to race!</p>
 
-  <div class="hud">
-    <div>Score: <span id="score">0</span></div>
-    <div>Speed: <span id="speed">1</span></div>
-    <div>Coins: 🪙 <span id="coins">0</span></div>
-    <div>Best: <span id="best">0</span></div>
-  </div>
+<!-- MAIN MENU -->
+<div class="panel" id="menu">
+    <button onclick="startSingle()">🎮 Single Player</button>
+    <br>
+    <button onclick="showMultiplayer()">🌐 Multiplayer</button>
+    <p>Coins: <span id="menuCoins">0</span></p>
+</div>
 
-  <label for="mapSelect">Choose map: </label>
-  <select id="mapSelect" onchange="changeMap(this.value)">
-    <option value="city">City</option>
-    <option value="desert">Desert</option>
-    <option value="highway">Highway</option>
-  </select>
+<!-- MULTIPLAYER MENU -->
+<div class="panel hidden" id="multiplayerMenu">
+    <h2>🌐 Online Multiplayer</h2>
 
-  <canvas id="game" width="400" height="600"></canvas>
+    <p>Create a room and share its code with a friend.</p>
+    <button onclick="createRoom()">Create Room</button>
 
-  <div id="turboTrack"><div id="turboBar"></div></div>
-  <div>Turbo energy</div>
+    <div id="roomInfo" class="hidden">
+        <p>Your room code:</p>
+        <h2 id="roomCode" style="color:#fde68a"></h2>
+        <button onclick="copyRoom()">Copy Room Code</button>
+        <p>Waiting for your friend to join...</p>
+    </div>
 
-  <div>
-    <button
-      onpointerdown="startMoving(-1)"
-      onpointerup="stopMoving()"
-      onpointerleave="stopMoving()"
-      onpointercancel="stopMoving()">⬅ LEFT</button>
+    <hr style="border-color:#164e63">
 
-    <button onclick="activateTurbo()">⚡ TURBO</button>
+    <p>Or enter your friend's room code:</p>
+    <input id="joinCode" placeholder="Enter room code" maxlength="6">
+    <br>
+    <button onclick="joinRoom()">Join Room</button>
 
-    <button
-      onpointerdown="startMoving(1)"
-      onpointerup="stopMoving()"
-      onpointerleave="stopMoving()"
-      onpointercancel="stopMoving()">RIGHT ➡</button>
-  </div>
+    <p id="connectionStatus">Not connected</p>
+    <button onclick="backToMenu()">Back</button>
+</div>
 
-  <div>
-    <button onclick="togglePause()">⏸ PAUSE</button>
-    <button onclick="restartGame()">🔄 RESTART</button>
-  </div>
+<!-- GAME -->
+<div id="gameArea" class="hidden">
 
-  <p id="message">Collect the gold coins! 🪙</p>
+    <div class="hud">
+        <div>Score: <span id="score">0</span></div>
+        <div>Coins: <span id="coins">0</span></div>
+        <div>Speed: <span id="speed">1</span></div>
+        <div>Turbo: <span id="turbo">100</span>%</div>
+    </div>
 
-  <div class="panel">
-    <h2>🏆 Achievements</h2>
-    <div id="achievementList"></div>
-  </div>
+    <p id="modeLabel">Single Player</p>
+    <p id="status">Get ready!</p>
 
-  <div class="panel">
-    <h2>🚘 Car Garage</h2>
-    <p>Buy cars with your earned coins.</p>
-    <div id="garage"></div>
-  </div>
+    <canvas id="game" width="400" height="600"></canvas>
 
-  <div class="panel">
-    <h2>🎁 Prizes</h2>
-    <p>Collect coins on the road and unlock achievements.</p>
-    <p>Coins available: 🪙 <strong id="prizeCoins">0</strong></p>
-  </div>
+    <div id="result"></div>
+
+    <div class="controls">
+        <button id="leftBtn">⬅️ LEFT</button>
+        <button id="rightBtn">RIGHT ➡️</button>
+        <button id="turboBtn">⚡ TURBO</button>
+    </div>
+
+    <div class="controls">
+        <button id="pauseBtn" onclick="togglePause()">⏸ PAUSE</button>
+        <button onclick="resetGame()">🔄 RESTART</button>
+        <button onclick="exitGame()">🏠 MENU</button>
+    </div>
+
+    <p>Keyboard: ← → or A/D to steer | ↑ to turbo | Space to restart</p>
+</div>
+
+<div class="panel">
+    <h3>🏆 Racing Records</h3>
+    <p>Best Score: <span id="bestScore">0</span></p>
+    <p>Total Coins: <span id="totalCoins">0</span></p>
 </div>
 
 <script>
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
-const scoreEl = document.getElementById("score");
-const speedEl = document.getElementById("speed");
-const coinsEl = document.getElementById("coins");
-const bestEl = document.getElementById("best");
-const messageEl = document.getElementById("message");
-const turboBar = document.getElementById("turboBar");
+const menu = document.getElementById("menu");
+const multiplayerMenu = document.getElementById("multiplayerMenu");
+const gameArea = document.getElementById("gameArea");
 
-const roadLeft = 55;
-const roadRight = 345;
+let mode = "single";
+let peer = null;
+let connection = null;
+let isHost = false;
+let connected = false;
 
+let room = "";
+let gameRunning = false;
+let paused = false;
+let gameOver = false;
+
+let lastTime = 0;
+let roadOffset = 0;
 let score = 0;
 let speed = 1;
-let gameOver = false;
-let paused = false;
-let frame = 0;
-let roadLineOffset = 0;
-let turboEnergy = 100;
-let turboActive = false;
+let turbo = 100;
 let turboUses = 0;
-let currentMap = "city";
-let enemies = [];
+let coinsCollected = 0;
+let spawnTimer = 0;
+let gameTime = 60;
+
+let obstacles = [];
 let roadCoins = [];
-let lastTime = 0;
-let coinMessageTimer = 0;
 
-const keys = { left: false, right: false };
-let buttonDirection = 0;
+let savedCoins = Number(localStorage.getItem("nightCoins")) || 0;
+let bestScore = Number(localStorage.getItem("nightBest")) || 0;
 
-const player = {
-  x: 180,
-  y: 490,
-  w: 40,
-  h: 72,
-  moveSpeed: 330
+document.getElementById("menuCoins").textContent = savedCoins;
+document.getElementById("totalCoins").textContent = savedCoins;
+document.getElementById("bestScore").textContent = bestScore;
+
+const keys = {
+    left: false,
+    right: false,
+    turbo: false
 };
 
-const cars = [
-  { id: "starter", name: "Starter", color: "#06b6d4", price: 0 },
-  { id: "red", name: "Fire Racer", color: "#ef4444", price: 150 },
-  { id: "green", name: "Lime Machine", color: "#22c55e", price: 300 },
-  { id: "purple", name: "Purple Storm", color: "#a855f7", price: 500 },
-  { id: "gold", name: "Golden Legend", color: "#facc15", price: 800 }
-];
+let players = [];
 
-const achievements = [
-  { id: "first", name: "First Race", description: "Reach 100 points", reward: 50 },
-  { id: "speed", name: "Speed Demon", description: "Reach speed level 5", reward: 100 },
-  { id: "survivor", name: "Survivor", description: "Reach 500 points", reward: 150 },
-  { id: "highscore", name: "High Scorer", description: "Reach 1,000 points", reward: 250 },
-  { id: "turbo", name: "Turbo Master", description: "Use turbo 10 times", reward: 100 },
-  { id: "collector", name: "Car Collector", description: "Unlock every car", reward: 300 }
-];
-
-function loadData() {
-  try {
-    return JSON.parse(localStorage.getItem("nightRacerSave")) || {};
-  } catch {
-    return {};
-  }
+function newPlayer(x, color, name) {
+    return {
+        x: x,
+        y: 490,
+        width: 38,
+        height: 68,
+        color: color,
+        name: name,
+        score: 0,
+        alive: true,
+        turbo: 100,
+        turboUses: 0
+    };
 }
 
-const saved = loadData();
-
-let coins = Number(saved.coins) || 0;
-let best = Number(saved.best) || 0;
-let unlockedCars = Array.isArray(saved.unlockedCars)
-  ? saved.unlockedCars : ["starter"];
-let selectedCar = saved.selectedCar || "starter";
-let unlockedAchievements = Array.isArray(saved.unlockedAchievements)
-  ? saved.unlockedAchievements : [];
-
-if (!cars.some(car => car.id === selectedCar) ||
-    !unlockedCars.includes(selectedCar)) {
-  selectedCar = "starter";
+function showMultiplayer() {
+    menu.classList.add("hidden");
+    multiplayerMenu.classList.remove("hidden");
 }
 
-function saveData() {
-  localStorage.setItem("nightRacerSave", JSON.stringify({
-    coins,
-    best,
-    unlockedCars,
-    selectedCar,
-    unlockedAchievements
-  }));
+function backToMenu() {
+    disconnectNetwork();
+    multiplayerMenu.classList.add("hidden");
+    menu.classList.remove("hidden");
+    document.getElementById("roomInfo").classList.add("hidden");
+    document.getElementById("connectionStatus").textContent = "Not connected";
 }
 
-function selectedColor() {
-  return cars.find(car => car.id === selectedCar)?.color || "#06b6d4";
+function startSingle() {
+    disconnectNetwork();
+    mode = "single";
+    menu.classList.add("hidden");
+    multiplayerMenu.classList.add("hidden");
+    gameArea.classList.remove("hidden");
+
+    document.getElementById("modeLabel").textContent = "🎮 Single Player";
+    document.getElementById("status").textContent = "Avoid traffic and collect coins!";
+    document.getElementById("result").textContent = "";
+
+    resetGame();
 }
 
-function updateHUD() {
-  scoreEl.textContent = score;
-  speedEl.textContent = speed;
-  coinsEl.textContent = coins;
-  bestEl.textContent = best;
-  document.getElementById("prizeCoins").textContent = coins;
-
-  turboBar.style.width = turboEnergy + "%";
-  turboBar.style.background =
-    turboEnergy < 25 ? "#ef4444" : "#22d3ee";
-}
-
-function changeMap(map) {
-  currentMap = map;
-  draw();
-}
-
-function drawBackground() {
-  if (currentMap === "desert") {
-    ctx.fillStyle = "#ca8a04";
-    ctx.fillRect(0, 0, 400, 600);
-    ctx.fillStyle = "#78350f";
-    ctx.fillRect(0, 0, 55, 600);
-    ctx.fillRect(345, 0, 55, 600);
-  } else if (currentMap === "highway") {
-    ctx.fillStyle = "#166534";
-    ctx.fillRect(0, 0, 400, 600);
-  } else {
-    ctx.fillStyle = "#111827";
-    ctx.fillRect(0, 0, 400, 600);
-    ctx.fillStyle = "#1e293b";
-    ctx.fillRect(0, 0, 55, 600);
-    ctx.fillRect(345, 0, 55, 600);
-
-    for (let y = 0; y < 600; y += 100) {
-      let yy = (y + roadLineOffset * 0.3) % 650;
-      ctx.fillStyle = "#334155";
-      ctx.fillRect(12, yy, 25, 45);
-      ctx.fillRect(363, yy, 25, 45);
-      ctx.fillStyle = "#facc15";
-      ctx.fillRect(20, yy + 10, 5, 5);
-      ctx.fillRect(370, yy + 10, 5, 5);
+function createRoom() {
+    if (typeof Peer === "undefined") {
+        alert("PeerJS could not load. Check your internet connection.");
+        return;
     }
-  }
 
-  ctx.fillStyle = "#475569";
-  ctx.fillRect(roadLeft, 0, 290, 600);
+    room = Math.random().toString(36).substring(2, 8).toUpperCase();
+    isHost = true;
 
-  ctx.fillStyle = "#f8fafc";
-  ctx.fillRect(roadLeft, 0, 4, 600);
-  ctx.fillRect(roadRight - 4, 0, 4, 600);
+    document.getElementById("roomCode").textContent = room;
+    document.getElementById("roomInfo").classList.remove("hidden");
+    document.getElementById("connectionStatus").textContent = "Creating room...";
 
-  ctx.fillStyle = "#facc15";
-  for (let y = -100; y < 700; y += 100) {
-    let lineY = (y + roadLineOffset) % 700;
-    ctx.fillRect(150, lineY, 5, 45);
-    ctx.fillRect(245, lineY, 5, 45);
-  }
+    peer = new Peer("nightracer-" + room.toLowerCase());
+
+    peer.on("open", function() {
+        document.getElementById("connectionStatus").textContent =
+            "Room created! Waiting for player 2.";
+    });
+
+    peer.on("connection", function(conn) {
+        if (connection) {
+            conn.close();
+            return;
+        }
+
+        connection = conn;
+
+        connection.on("open", function() {
+            connected = true;
+            startMultiplayer();
+            document.getElementById("connectionStatus").textContent =
+                "Friend connected! Race started.";
+            document.getElementById("status").textContent =
+                "Player 2 joined. GO!";
+            sendState();
+        });
+
+        connection.on("data", function(data) {
+            if (data.type === "input") {
+                remoteInput = data.input;
+            }
+        });
+
+        connection.on("close", function() {
+            connected = false;
+            document.getElementById("status").textContent =
+                "Your opponent disconnected.";
+        });
+    });
+
+    peer.on("error", function(err) {
+        document.getElementById("connectionStatus").textContent =
+            "Connection error: " + err.type;
+    });
 }
 
-function roundedRect(x, y, w, h, r) {
-  ctx.beginPath();
-  ctx.roundRect(x, y, w, h, r);
+function copyRoom() {
+    navigator.clipboard.writeText(room).then(function() {
+        alert("Room code copied! Send it to your friend.");
+    }).catch(function() {
+        alert("Your room code is: " + room);
+    });
 }
 
-function drawCar(x, y, w, h, color, isPlayer = false) {
-  ctx.fillStyle = "rgba(0,0,0,0.4)";
-  roundedRect(x + 3, y + 5, w, h, 9);
-  ctx.fill();
+function joinRoom() {
+    if (typeof Peer === "undefined") {
+        alert("PeerJS could not load. Check your internet connection.");
+        return;
+    }
 
-  ctx.fillStyle = "#020617";
-  ctx.fillRect(x - 4, y + 12, 7, 18);
-  ctx.fillRect(x + w - 3, y + 12, 7, 18);
-  ctx.fillRect(x - 4, y + h - 30, 7, 18);
-  ctx.fillRect(x + w - 3, y + h - 30, 7, 18);
+    room = document.getElementById("joinCode").value.trim().toUpperCase();
 
-  const gradient = ctx.createLinearGradient(x, y, x + w, y);
-  gradient.addColorStop(0, "#111827");
-  gradient.addColorStop(0.25, color);
-  gradient.addColorStop(0.75, color);
-  gradient.addColorStop(1, "#111827");
+    if (!/^[A-Z0-9]{6}$/.test(room)) {
+        alert("Enter a valid 6-character room code.");
+        return;
+    }
 
-  ctx.fillStyle = gradient;
-  roundedRect(x, y, w, h, 9);
-  ctx.fill();
+    isHost = false;
+    document.getElementById("connectionStatus").textContent = "Connecting...";
 
-  ctx.strokeStyle = "rgba(255,255,255,0.55)";
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
+    peer = new Peer();
 
-  ctx.fillStyle = "#0f172a";
-  roundedRect(x + 6, y + 12, w - 12, 18, 5);
-  ctx.fill();
-  roundedRect(x + 6, y + 42, w - 12, 14, 4);
-  ctx.fill();
+    peer.on("open", function() {
+        connection = peer.connect("nightracer-" + room.toLowerCase(), {
+            reliable: true
+        });
 
-  ctx.fillStyle = "rgba(255,255,255,0.35)";
-  ctx.fillRect(x + 10, y + 15, 3, 12);
+        connection.on("open", function() {
+            connected = true;
+            mode = "multiplayer";
+            multiplayerMenu.classList.add("hidden");
+            gameArea.classList.remove("hidden");
 
-  ctx.fillStyle = color;
-  roundedRect(x + 8, y + 31, w - 16, 10, 3);
-  ctx.fill();
+            document.getElementById("modeLabel").textContent =
+                "🌐 Online Multiplayer - Player 2";
+            document.getElementById("status").textContent =
+                "Connected! Waiting for race data.";
+        });
 
-  ctx.fillStyle = isPlayer ? "#fef08a" : "#ef4444";
+        connection.on("data", function(data) {
+            if (data.type === "state") {
+                receiveState(data.state);
+            }
+        });
 
-  if (isPlayer) {
-    ctx.fillRect(x + 4, y + 2, 9, 5);
-    ctx.fillRect(x + w - 13, y + 2, 9, 5);
-  } else {
-    ctx.fillRect(x + 4, y + h - 6, 9, 5);
-    ctx.fillRect(x + w - 13, y + h - 6, 9, 5);
-  }
+        connection.on("error", function() {
+            document.getElementById("connectionStatus").textContent =
+                "Could not connect. Check the room code.";
+        });
 
-  if (isPlayer && turboActive) {
-    ctx.fillStyle = "#f97316";
-    ctx.fillRect(x + 9, y + h, 6, 22);
-    ctx.fillRect(x + 25, y + h, 6, 22);
-  }
+        connection.on("close", function() {
+            connected = false;
+            document.getElementById("status").textContent =
+                "Host disconnected.";
+        });
+    });
+
+    peer.on("error", function(err) {
+        document.getElementById("connectionStatus").textContent =
+            "Connection error: " + err.type;
+    });
 }
 
-// Draw collectible coins
-function drawCoin(coin) {
-  const pulse = Math.sin(frame * 0.12 + coin.phase) * 2;
-  const radius = 10 + pulse;
+let remoteInput = {
+    left: false,
+    right: false,
+    turbo: false
+};
 
-  ctx.save();
+function startMultiplayer() {
+    mode = "multiplayer";
+    multiplayerMenu.classList.add("hidden");
+    gameArea.classList.remove("hidden");
 
-  ctx.shadowColor = "#facc15";
-  ctx.shadowBlur = 15;
+    document.getElementById("modeLabel").textContent =
+        "🌐 Online Multiplayer - Player 1";
 
-  ctx.fillStyle = "#facc15";
-  ctx.beginPath();
-  ctx.arc(coin.x, coin.y, radius, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.shadowBlur = 0;
-  ctx.strokeStyle = "#fef3c7";
-  ctx.lineWidth = 2;
-  ctx.stroke();
-
-  ctx.fillStyle = "#92400e";
-  ctx.font = "bold 13px Arial";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText("$", coin.x, coin.y + 1);
-
-  ctx.restore();
+    resetGame();
 }
 
-// Create coins in one of the road lanes
-function spawnCoin() {
-  const lanes = [105, 200, 295];
-
-  roadCoins.push({
-    x: lanes[Math.floor(Math.random() * lanes.length)],
-    y: -30,
-    radius: 12,
-    phase: Math.random() * Math.PI * 2,
-    value: 5
-  });
+function disconnectNetwork() {
+    connected = false;
+    if (connection) {
+        connection.close();
+        connection = null;
+    }
+    if (peer) {
+        peer.destroy();
+        peer = null;
+    }
 }
 
-function collectCoin(index) {
-  const coin = roadCoins[index];
+function resetGame() {
+    score = 0;
+    speed = 1;
+    turbo = 100;
+    turboUses = 0;
+    coinsCollected = 0;
+    spawnTimer = 0;
+    roadOffset = 0;
+    gameTime = 60;
 
-  coins += coin.value;
-  score += 5;
+    obstacles = [];
+    roadCoins = [];
+    gameOver = false;
+    paused = false;
 
-  roadCoins.splice(index, 1);
+    keys.left = false;
+    keys.right = false;
+    keys.turbo = false;
+    remoteInput = {left:false, right:false, turbo:false};
 
-  messageEl.textContent = "🪙 +5 COINS! Great driving!";
-  coinMessageTimer = 120;
+    if (mode === "multiplayer") {
+        players = [
+            newPlayer(125, "#22d3ee", "PLAYER 1"),
+            newPlayer(275, "#f472b6", "PLAYER 2")
+        ];
+    } else {
+        players = [
+            newPlayer(180, "#22d3ee", "YOU")
+        ];
+    }
 
-  updateHUD();
-  saveData();
-  checkAchievements();
-}
+    document.getElementById("result").textContent = "";
+    document.getElementById("pauseBtn").textContent = "⏸ PAUSE";
 
-function spawnEnemy() {
-  const lanes = [90, 180, 270];
-  const lane = lanes[Math.floor(Math.random() * lanes.length)];
-  const colors = ["#ef4444", "#22c55e", "#a855f7", "#f97316", "#eab308"];
+    gameRunning = true;
+    lastTime = 0;
 
-  enemies.push({
-    x: lane,
-    y: -90,
-    w: 40,
-    h: 72,
-    color: colors[Math.floor(Math.random() * colors.length)],
-    passed: false
-  });
-}
+    updateHUD();
 
-function startMoving(direction) {
-  buttonDirection = direction;
-}
-
-function stopMoving() {
-  buttonDirection = 0;
-}
-
-function activateTurbo() {
-  if (!gameOver && !paused && turboEnergy >= 20 && !turboActive) {
-    turboActive = true;
-    turboUses++;
-    checkAchievements();
-
-    setTimeout(() => {
-      turboActive = false;
-    }, 1500);
-  }
+    if (mode === "multiplayer" && isHost) sendState();
 }
 
 function togglePause() {
-  if (gameOver) return;
-  paused = !paused;
-  messageEl.textContent = paused ? "Game paused" : "Race resumed!";
+    if (mode === "multiplayer") {
+        document.getElementById("status").textContent =
+            "Online races cannot be paused.";
+        return;
+    }
+
+    if (gameOver) return;
+
+    paused = !paused;
+    document.getElementById("pauseBtn").textContent =
+        paused ? "▶ RESUME" : "⏸ PAUSE";
 }
 
-function checkCollision(a, b) {
-  return a.x + 5 < b.x + b.w - 5 &&
-    a.x + a.w - 5 > b.x + 5 &&
-    a.y + 7 < b.y + b.h - 7 &&
-    a.y + a.h - 7 > b.y + 7;
+function exitGame() {
+    gameRunning = false;
+    disconnectNetwork();
+
+    gameArea.classList.add("hidden");
+    multiplayerMenu.classList.add("hidden");
+    menu.classList.remove("hidden");
+
+    document.getElementById("menuCoins").textContent = savedCoins;
 }
 
-function checkCoinCollision(car, coin) {
-  const closestX = Math.max(car.x, Math.min(coin.x, car.x + car.w));
-  const closestY = Math.max(car.y, Math.min(coin.y, car.y + car.h));
+function sendState() {
+    if (!isHost || !connected || !connection || !connection.open) return;
 
-  const dx = coin.x - closestX;
-  const dy = coin.y - closestY;
-
-  return dx * dx + dy * dy < coin.radius * coin.radius;
+    connection.send({
+        type: "state",
+        state: {
+            players: players,
+            obstacles: obstacles,
+            roadCoins: roadCoins,
+            score: score,
+            speed: speed,
+            gameTime: gameTime,
+            roadOffset: roadOffset,
+            gameOver: gameOver,
+            result: document.getElementById("result").textContent
+        }
+    });
 }
 
-function unlockAchievement(id) {
-  if (unlockedAchievements.includes(id)) return;
+function receiveState(state) {
+    if (isHost || !state) return;
 
-  const achievement = achievements.find(a => a.id === id);
-  if (!achievement) return;
+    players = state.players;
+    obstacles = state.obstacles;
+    roadCoins = state.roadCoins;
+    score = state.score;
+    speed = state.speed;
+    gameTime = state.gameTime;
+    roadOffset = state.roadOffset;
+    gameOver = state.gameOver;
 
-  unlockedAchievements.push(id);
-  coins += achievement.reward;
+    document.getElementById("result").textContent = state.result || "";
 
-  messageEl.textContent =
-    "🏆 " + achievement.name + "! +" + achievement.reward + " coins!";
+    if (gameOver) {
+        gameRunning = false;
+    } else {
+        gameRunning = true;
+    }
 
-  saveData();
-  updateHUD();
-  renderAchievements();
+    updateHUD();
 }
 
-function checkAchievements() {
-  if (score >= 100) unlockAchievement("first");
-  if (speed >= 5) unlockAchievement("speed");
-  if (score >= 500) unlockAchievement("survivor");
-  if (score >= 1000) unlockAchievement("highscore");
-  if (turboUses >= 10) unlockAchievement("turbo");
-  if (unlockedCars.length >= cars.length) unlockAchievement("collector");
+function saveProgress() {
+    localStorage.setItem("nightCoins", savedCoins);
+    localStorage.setItem("nightBest", bestScore);
+
+    document.getElementById("totalCoins").textContent = savedCoins;
+    document.getElementById("menuCoins").textContent = savedCoins;
+    document.getElementById("bestScore").textContent = bestScore;
 }
 
-function renderAchievements() {
-  const list = document.getElementById("achievementList");
-  list.innerHTML = "";
-
-  achievements.forEach(a => {
-    const unlocked = unlockedAchievements.includes(a.id);
-    let progress = 0;
-
-    if (a.id === "first") progress = Math.min(score / 100 * 100, 100);
-    if (a.id === "speed") progress = Math.min(speed / 5 * 100, 100);
-    if (a.id === "survivor") progress = Math.min(score / 500 * 100, 100);
-    if (a.id === "highscore") progress = Math.min(score / 1000 * 100, 100);
-    if (a.id === "turbo") progress = Math.min(turboUses / 10 * 100, 100);
-    if (a.id === "collector") progress = Math.min(unlockedCars.length / cars.length * 100, 100);
-
-    const div = document.createElement("div");
-    div.className = "achievement" + (unlocked ? " unlocked" : "");
-    div.innerHTML = `
-      <strong>${unlocked ? "🏆" : "🔒"} ${a.name}</strong>
-      <small>${a.description}</small>
-      <small>Prize: ${a.reward} coins</small>
-      <div class="progress">
-        <div style="width:${progress}%"></div>
-      </div>
-    `;
-    list.appendChild(div);
-  });
+function updateHUD() {
+    document.getElementById("score").textContent = score;
+    document.getElementById("coins").textContent = savedCoins;
+    document.getElementById("speed").textContent = speed.toFixed(1);
+    document.getElementById("turbo").textContent = Math.round(turbo);
 }
 
-function renderGarage() {
-  const garage = document.getElementById("garage");
-  garage.innerHTML = "";
+function spawnObstacle() {
+    const lanes = [105, 200, 295];
+    const lane = lanes[Math.floor(Math.random() * lanes.length)];
 
-  cars.forEach(car => {
-    const unlocked = unlockedCars.includes(car.id);
-    const selected = selectedCar === car.id;
+    obstacles.push({
+        x: lane - 19,
+        y: -90,
+        width: 38,
+        height: 65,
+        color: ["#ef4444", "#a78bfa", "#f97316"][Math.floor(Math.random() * 3)]
+    });
+}
 
-    const div = document.createElement("div");
-    div.className = "achievement";
-    div.innerHTML = `
-      <strong style="color:${car.color}">🚘 ${car.name}</strong>
-      <small>${unlocked ? "Unlocked" : "Price: " + car.price + " coins"}</small>
-      <small>${selected ? "Currently selected" : ""}</small>
-      <button>${selected ? "SELECTED" : unlocked ? "SELECT" : "BUY"}</button>
-    `;
+function spawnCoin() {
+    const lanes = [105, 200, 295];
+    const lane = lanes[Math.floor(Math.random() * lanes.length)];
 
-    div.querySelector("button").addEventListener("click", () => {
-      if (unlocked) {
-        selectedCar = car.id;
-        saveData();
-        renderGarage();
-        messageEl.textContent = car.name + " selected!";
-      } else {
-        buyCar(car);
-      }
+    roadCoins.push({
+        x: lane,
+        y: -25,
+        radius: 12
+    });
+}
+
+function collides(a, b) {
+    return (
+        a.x < b.x + b.width &&
+        a.x + a.width > b.x &&
+        a.y < b.y + b.height &&
+        a.y + a.height > b.y
+    );
+}
+
+function collectCoins(player) {
+    for (let i = roadCoins.length - 1; i >= 0; i--) {
+        const coin = roadCoins[i];
+
+        const closestX = Math.max(player.x, Math.min(coin.x, player.x + player.width));
+        const closestY = Math.max(player.y, Math.min(coin.y, player.y + player.height));
+
+        const dx = coin.x - closestX;
+        const dy = coin.y - closestY;
+
+        if (dx * dx + dy * dy < coin.radius * coin.radius) {
+            savedCoins += 5;
+            coinsCollected += 5;
+            score += 5;
+            roadCoins.splice(i, 1);
+            saveProgress();
+        }
+    }
+}
+
+function movePlayer(player, input, dt) {
+    if (!player.alive) return;
+
+    const moveSpeed = 260;
+    const turboOn = input.turbo && player.turbo > 0;
+
+    if (input.left) player.x -= moveSpeed * dt;
+    if (input.right) player.x += moveSpeed * dt;
+
+    player.x = Math.max(45, Math.min(317, player.x));
+
+    if (turboOn) {
+        player.turbo = Math.max(0, player.turbo - 45 * dt);
+    } else {
+        player.turbo = Math.min(100, player.turbo + 18 * dt);
+    }
+}
+
+function updateGame(dt) {
+    if (mode === "multiplayer" && !isHost) return;
+    if (paused || gameOver) return;
+
+    const player1 = players[0];
+    const player2 = players[1];
+
+    let turboActive = keys.turbo && turbo > 0;
+
+    if (turboActive) {
+        turbo = Math.max(0, turbo - 40 * dt);
+    } else {
+        turbo = Math.min(100, turbo + 15 * dt);
+    }
+
+    if (turboActive && !previousTurbo) {
+        turboUses++;
+    }
+    previousTurbo = turboActive;
+
+    if (mode === "single") {
+        movePlayer(player1, keys, dt);
+    } else {
+        movePlayer(player1, keys, dt);
+        movePlayer(player2, remoteInput, dt);
+    }
+
+    const gameSpeed = (220 + speed * 15) * (turboActive ? 1.7 : 1);
+
+    roadOffset += gameSpeed * dt;
+
+    spawnTimer += dt;
+
+    if (spawnTimer > Math.max(0.55, 1.5 - speed * 0.06)) {
+        spawnObstacle();
+        spawnTimer = 0;
+    }
+
+    if (Math.random() < dt * 0.7 && roadCoins.length < 5) {
+        spawnCoin();
+    }
+
+    obstacles.forEach(obstacle => obstacle.y += gameSpeed * dt);
+    roadCoins.forEach(coin => coin.y += gameSpeed * dt);
+
+    obstacles = obstacles.filter(o => o.y < 650);
+    roadCoins = roadCoins.filter(c => c.y < 650);
+
+    for (const player of players) {
+        if (!player.alive) continue;
+
+        collectCoins(player);
+
+        for (const obstacle of obstacles) {
+            if (collides(player, obstacle)) {
+                player.alive = false;
+            }
+        }
+    }
+
+    if (mode === "single") {
+        score += Math.floor(dt * 10);
+        speed = 1 + Math.floor(score / 250) * 0.3;
+
+        if (!player1.alive) {
+            finishGame("💥 GAME OVER! Score: " + score);
+        }
+    } else {
+        gameTime -= dt;
+
+        if (!player1.alive || !player2.alive || gameTime <= 0) {
+            let result;
+
+            if (!player1.alive && !player2.alive) {
+                result = "DRAW! Both racers crashed!";
+            } else if (!player1.alive) {
+                result = "🏆 PLAYER 2 WINS!";
+            } else if (!player2.alive) {
+                result = "🏆 PLAYER 1 WINS!";
+            } else {
+                result = "🏁 TIME UP! Race finished!";
+            }
+
+            if (player1.alive && player2.alive) {
+                result = player1.score >= player2.score ?
+                    "🏆 PLAYER 1 WINS!" : "🏆 PLAYER 2 WINS!";
+            }
+
+            finishGame(result);
+        } else {
+            player1.score += dt * 10;
+            player2.score += dt * 10;
+            score = Math.floor(player1.score);
+        }
+    }
+
+    if (score > bestScore && mode === "single") {
+        bestScore = score;
+        saveProgress();
+    }
+
+    updateHUD();
+}
+
+let previousTurbo = false;
+
+function finishGame(message) {
+    gameOver = true;
+    gameRunning = false;
+    document.getElementById("result").textContent = message;
+
+    if (mode === "multiplayer" && isHost) {
+        sendState();
+    }
+}
+
+function drawRoad() {
+    ctx.fillStyle = "#166534";
+    ctx.fillRect(0, 0, 400, 600);
+
+    ctx.fillStyle = "#292524";
+    ctx.fillRect(40, 0, 320, 600);
+
+    ctx.fillStyle = "#facc15";
+    ctx.fillRect(45, 0, 4, 600);
+    ctx.fillRect(351, 0, 4, 600);
+
+    ctx.strokeStyle = "#e5e7eb";
+    ctx.lineWidth = 4;
+    ctx.setLineDash([35, 30]);
+
+    const offset = roadOffset % 65;
+
+    ctx.beginPath();
+    ctx.moveTo(147, -65 + offset);
+    ctx.lineTo(147, 665);
+    ctx.moveTo(253, -65 + offset);
+    ctx.lineTo(253, 665);
+    ctx.stroke();
+
+    ctx.setLineDash([]);
+}
+
+function drawCar(car) {
+    ctx.save();
+
+    // Shadow
+    ctx.fillStyle = "rgba(0,0,0,0.5)";
+    ctx.fillRect(car.x + 4, car.y + 5, car.width, car.height);
+
+    // Wheels
+    ctx.fillStyle = "#020617";
+    ctx.fillRect(car.x - 4, car.y + 12, 7, 16);
+    ctx.fillRect(car.x + car.width - 3, car.y + 12, 7, 16);
+    ctx.fillRect(car.x - 4, car.y + 44, 7, 16);
+    ctx.fillRect(car.x + car.width - 3, car.y + 44, 7, 16);
+
+    // Body
+    ctx.fillStyle = car.color;
+    ctx.beginPath();
+    ctx.roundRect(car.x, car.y, car.width, car.height, 9);
+    ctx.fill();
+
+    // Windows
+    ctx.fillStyle = "#bae6fd";
+    ctx.fillRect(car.x + 6, car.y + 13, car.width - 12, 16);
+    ctx.fillStyle = "#0f172a";
+    ctx.fillRect(car.x + 6, car.y + 37, car.width - 12, 12);
+
+    // Lights
+    ctx.fillStyle = "#fef08a";
+    ctx.fillRect(car.x + 4, car.y + 3, 8, 5);
+    ctx.fillRect(car.x + car.width - 12, car.y + 3, 8, 5);
+
+    ctx.fillStyle = "#ef4444";
+    ctx.fillRect(car.x + 4, car.y + 59, 8, 5);
+    ctx.fillRect(car.x + car.width - 12, car.y + 59, 8, 5);
+
+    ctx.restore();
+
+    if (mode === "multiplayer") {
+        ctx.fillStyle = "white";
+        ctx.font = "bold 11px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText(car.name, car.x + car.width / 2, car.y - 8);
+    }
+}
+
+function drawObstacle(obstacle) {
+    const car = {
+        x: obstacle.x,
+        y: obstacle.y,
+        width: obstacle.width,
+        height: obstacle.height,
+        color: obstacle.color
+    };
+    drawCar(car);
+}
+
+function drawCoin(coin) {
+    ctx.save();
+    ctx.shadowColor = "#facc15";
+    ctx.shadowBlur = 15;
+
+    ctx.fillStyle = "#facc15";
+    ctx.beginPath();
+    ctx.arc(coin.x, coin.y, coin.radius, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = "#854d0e";
+    ctx.font = "bold 14px Arial";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("$", coin.x, coin.y);
+
+    ctx.restore();
+}
+
+function drawGame() {
+    ctx.clearRect(0, 0, 400, 600);
+
+    drawRoad();
+
+    roadCoins.forEach(drawCoin);
+    obstacles.forEach(drawObstacle);
+
+    players.forEach(player => {
+        if (player.alive) drawCar(player);
     });
 
-    garage.appendChild(div);
-  });
-}
-
-function buyCar(car) {
-  if (coins < car.price) {
-    messageEl.textContent = "Not enough coins to buy " + car.name + "!";
-    return;
-  }
-
-  if (unlockedCars.includes(car.id)) return;
-
-  coins -= car.price;
-  unlockedCars.push(car.id);
-  selectedCar = car.id;
-
-  saveData();
-  updateHUD();
-  renderGarage();
-  checkAchievements();
-
-  messageEl.textContent = "🎉 You unlocked " + car.name + "!";
-}
-
-function endGame() {
-  gameOver = true;
-  turboActive = false;
-
-  if (score > best) {
-    best = score;
-    saveData();
-  }
-
-  updateHUD();
-  messageEl.textContent =
-    "💥 CRASH! Final score: " + score + ". Press SPACE to restart.";
-}
-
-function update(delta) {
-  if (gameOver || paused) return;
-
-  frame++;
-
-  // Smooth movement
-  let direction = 0;
-
-  if (keys.left) direction -= 1;
-  if (keys.right) direction += 1;
-  direction += buttonDirection;
-  direction = Math.max(-1, Math.min(1, direction));
-
-  player.x += direction * player.moveSpeed * delta;
-  player.x = Math.max(
-    roadLeft + 10,
-    Math.min(roadRight - player.w - 10, player.x)
-  );
-
-  const gameSpeed = (turboActive ? 7 : 3) + speed * 0.45;
-  const movement = gameSpeed * delta * 60;
-
-  roadLineOffset = (roadLineOffset + movement) % 100;
-
-  // Spawn traffic
-  if (frame % Math.max(22, 65 - speed * 5) === 0) {
-    spawnEnemy();
-  }
-
-  // Spawn collectible coins
-  if (frame % 65 === 0 && roadCoins.length < 5) {
-    spawnCoin();
-  }
-
-  // Update enemy cars
-  for (const enemy of enemies) {
-    enemy.y += movement;
-
-    if (checkCollision(player, enemy)) {
-      endGame();
-      break;
+    if (mode === "multiplayer") {
+        ctx.fillStyle = "white";
+        ctx.font = "bold 15px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText("TIME: " + Math.max(0, Math.ceil(gameTime)), 200, 25);
     }
 
-    if (!enemy.passed && enemy.y > player.y + player.h) {
-      enemy.passed = true;
-      score += 10;
+    if (paused) {
+        ctx.fillStyle = "rgba(0,0,0,0.65)";
+        ctx.fillRect(0, 0, 400, 600);
 
-      updateHUD();
-      checkAchievements();
-      saveData();
+        ctx.fillStyle = "white";
+        ctx.font = "bold 36px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText("PAUSED", 200, 300);
     }
-  }
-
-  enemies = enemies.filter(enemy => enemy.y < 650);
-
-  // Update and collect coins
-  for (let i = roadCoins.length - 1; i >= 0; i--) {
-    const coin = roadCoins[i];
-    coin.y += movement;
-
-    if (checkCoinCollision(player, coin)) {
-      collectCoin(i);
-    }
-  }
-
-  roadCoins = roadCoins.filter(coin => coin.y < 650);
-
-  if (frame % 300 === 0) {
-    speed++;
-    checkAchievements();
-  }
-
-  if (turboActive) {
-    turboEnergy = Math.max(0, turboEnergy - 48 * delta);
-    if (turboEnergy <= 0) turboActive = false;
-  } else {
-    turboEnergy = Math.min(100, turboEnergy + 11 * delta);
-  }
-
-  if (coinMessageTimer > 0) {
-    coinMessageTimer--;
-  }
-
-  updateHUD();
-}
-
-function draw() {
-  drawBackground();
-
-  // Draw coins behind cars
-  roadCoins.forEach(drawCoin);
-
-  enemies.forEach(enemy => {
-    drawCar(enemy.x, enemy.y, enemy.w, enemy.h, enemy.color);
-  });
-
-  drawCar(player.x, player.y, player.w, player.h, selectedColor(), true);
-
-  if (paused || gameOver) {
-    ctx.fillStyle = "rgba(2,6,23,0.75)";
-    ctx.fillRect(0, 0, 400, 600);
-    ctx.fillStyle = "#67e8f9";
-    ctx.font = "bold 34px Arial";
-    ctx.textAlign = "center";
-    ctx.fillText(paused ? "PAUSED" : "GAME OVER", 200, 280);
-    ctx.font = "18px Arial";
-    ctx.fillStyle = "white";
-    ctx.fillText(
-      paused ? "Press P to resume" : "Press SPACE to restart",
-      200, 320
-    );
-  }
 }
 
 function gameLoop(timestamp) {
-  const delta = lastTime
-    ? Math.min((timestamp - lastTime) / 1000, 0.04)
-    : 0;
+    requestAnimationFrame(gameLoop);
 
-  lastTime = timestamp;
+    if (!lastTime) lastTime = timestamp;
 
-  if (!paused && !gameOver) {
-    update(delta);
-  }
+    const dt = Math.min((timestamp - lastTime) / 1000, 0.04);
+    lastTime = timestamp;
 
-  draw();
-  requestAnimationFrame(gameLoop);
+    if (gameRunning && !paused) {
+        if (mode === "single" || isHost) {
+            updateGame(dt);
+        } else if (mode === "multiplayer" && connected) {
+            if (connection && connection.open) {
+                connection.send({
+                    type: "input",
+                    input: keys
+                });
+            }
+        }
+    }
+
+    drawGame();
+
+    if (mode === "multiplayer" && isHost && connected) {
+        broadcastTimer += dt;
+        if (broadcastTimer >= 0.05) {
+            sendState();
+            broadcastTimer = 0;
+        }
+    }
 }
 
-function restartGame() {
-  score = 0;
-  speed = 1;
-  frame = 0;
-  enemies = [];
-  roadCoins = [];
-  turboEnergy = 100;
-  turboActive = false;
-  gameOver = false;
-  paused = false;
-  coinMessageTimer = 0;
-
-  keys.left = false;
-  keys.right = false;
-  buttonDirection = 0;
-
-  player.x = 180;
-  lastTime = 0;
-
-  messageEl.textContent = "Collect the gold coins! 🪙";
-
-  updateHUD();
-  renderAchievements();
-  draw();
-}
+let broadcastTimer = 0;
 
 // Keyboard controls
-document.addEventListener("keydown", e => {
-  if (["ArrowLeft", "ArrowRight", "ArrowUp", " "].includes(e.key)) {
-    e.preventDefault();
-  }
+document.addEventListener("keydown", function(e) {
+    if (["ArrowLeft", "ArrowRight", "ArrowUp", "Space"].includes(e.code)) {
+        e.preventDefault();
+    }
 
-  if (e.code === "Space" && !e.repeat) {
-    restartGame();
-    return;
-  }
+    if (e.code === "ArrowLeft" || e.code === "KeyA") keys.left = true;
+    if (e.code === "ArrowRight" || e.code === "KeyD") keys.right = true;
+    if (e.code === "ArrowUp") keys.turbo = true;
 
-  if (e.key === "ArrowLeft" || e.key.toLowerCase() === "a") {
-    keys.left = true;
-  }
+    if (e.code === "Space" && !e.repeat) {
+        resetGame();
+    }
 
-  if (e.key === "ArrowRight" || e.key.toLowerCase() === "d") {
-    keys.right = true;
-  }
-
-  if (e.key === "ArrowUp" && !e.repeat) {
-    activateTurbo();
-  }
-
-  if (e.key.toLowerCase() === "p" && !e.repeat) {
-    togglePause();
-  }
+    if (e.code === "KeyP" && mode === "single" && !e.repeat) {
+        togglePause();
+    }
 });
 
-document.addEventListener("keyup", e => {
-  if (e.key === "ArrowLeft" || e.key.toLowerCase() === "a") {
-    keys.left = false;
-  }
-
-  if (e.key === "ArrowRight" || e.key.toLowerCase() === "d") {
-    keys.right = false;
-  }
+document.addEventListener("keyup", function(e) {
+    if (e.code === "ArrowLeft" || e.code === "KeyA") keys.left = false;
+    if (e.code === "ArrowRight" || e.code === "KeyD") keys.right = false;
+    if (e.code === "ArrowUp") keys.turbo = false;
 });
 
-window.addEventListener("blur", () => {
-  keys.left = false;
-  keys.right = false;
-  buttonDirection = 0;
-});
+// Mobile / mouse controls
+function holdButton(id, key) {
+    const button = document.getElementById(id);
 
-updateHUD();
-renderAchievements();
-renderGarage();
-draw();
+    button.addEventListener("pointerdown", function(e) {
+        e.preventDefault();
+        keys[key] = true;
+    });
+
+    button.addEventListener("pointerup", function() {
+        keys[key] = false;
+    });
+
+    button.addEventListener("pointerleave", function() {
+        keys[key] = false;
+    });
+
+    button.addEventListener("pointercancel", function() {
+        keys[key] = false;
+    });
+}
+
+holdButton("leftBtn", "left");
+holdButton("rightBtn", "right");
+holdButton("turboBtn", "turbo");
+
 requestAnimationFrame(gameLoop);
 </script>
+
 </body>
 </html>
